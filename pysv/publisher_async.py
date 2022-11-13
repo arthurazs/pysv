@@ -1,24 +1,16 @@
-from asyncio import gather, sleep
+from asyncio import gather
 from contextlib import suppress
 from socket import AF_PACKET, SOCK_RAW, socket
 from sys import argv
-from time import time_ns
 from typing import TYPE_CHECKING
 
 from uvloop import new_event_loop
 
-from pysv.sv import get_sv
+from pysv.sv import DEFAULT_PATH, generate_sv_from
+from pysv.utils import async_usleep
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
-
-
-async def usleep(microseconds: int) -> None:
-    end = time_ns() + (microseconds * 1e3)
-    while True:
-        await sleep(0)
-        if time_ns() >= end:
-            break
 
 
 async def run(loop: "AbstractEventLoop", interface: str) -> None:
@@ -26,8 +18,8 @@ async def run(loop: "AbstractEventLoop", interface: str) -> None:
         nic.bind((interface, 0))
         nic.setblocking(False)
 
-        for header, pdu in get_sv():
-            await gather(usleep(250), loop.sock_sendall(nic, header + pdu))
+        for header, pdu in generate_sv_from(DEFAULT_PATH):
+            await gather(async_usleep(250), loop.sock_sendall(nic, header + pdu))
 
 
 if __name__ == "__main__":
