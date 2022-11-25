@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pysv"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Arthur Zopellaro <arthurazsoares@gmail.com>"]
 readme = "README.md"
