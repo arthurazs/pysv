@@ -11,6 +11,8 @@ def run(interface: str) -> None:
     with socket(AF_PACKET, SOCK_RAW, 0xBA88) as nic:
         nic.bind((interface, 0))
 
+        print(time_ns())
+
         for counter in count():
             elapsed = time_ns()
             data = nic.recv(113)
