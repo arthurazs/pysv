@@ -40,3 +40,11 @@ If you wish to install both:
 ```bash
 pip install .[async,dev]
 ```
+
+## TODO
+
+- [ ] Fix ruff issues
+- [ ] Use logging instead of print
+- [ ] Make the pub/sub sync/async modules customizable
+- [ ] Write unit tests
+
