@@ -14,7 +14,7 @@ sudo apt install -y python3.10-venv
 
 ## Quickstart
 
-pysv should be ran as sudo, it also expects an interface name, _e.g._, `lo`
+pysv should be run as sudo, it also expects an interface name, _e.g._, `lo`, which can be changed in the `.env` file.
 
 ```bash
 git clone https://github.com/arthurazs/pysv
@@ -22,23 +22,16 @@ cd pysv
 python3.10 -m venv .venv
 . .venv/bin/activate
 
-pip install .
-sh publisher_sync.sh lo
-```
-
-If you wish to install async functionality:
-```bash
 pip install .[async]
+sudo .venv/bin/python -m pysv -ap  # async publisher
+sudo .venv/bin/python -m pysv -as  # async subscriber
 ```
+### Optional quickstart
 
-If you wish to install development tools:
-```bash
-pip install .[dev]
-```
+Instead of using the default file specified in the `.env` file, you can change it through the command line interface:
 
-If you wish to install both:
 ```bash
-pip install .[async,dev]
+sudo .venv/bin/python -m pysv -ap path/to/another_file.csv
 ```
 
 ## TODO

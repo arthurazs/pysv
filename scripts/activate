@@ -1,5 +1,0 @@
-if [ -d .venv ]; then
-    . .venv/bin/activate
-else
-    echo "> .venv folder not found"
-fi
