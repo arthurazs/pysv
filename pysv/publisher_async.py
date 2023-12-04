@@ -1,3 +1,4 @@
+import logging
 from asyncio import gather
 from socket import AF_PACKET, SOCK_RAW, socket
 from typing import TYPE_CHECKING
@@ -10,8 +11,11 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+logger = logging.getLogger(__name__)
+
 async def run(loop: "AbstractEventLoop", interface: str, csv_path: "Path") -> None:
     with socket(AF_PACKET, SOCK_RAW, 0xBA88) as nic:
+        logger.info("binding to %s", interface)
         nic.bind((interface, 0))
         nic.setblocking(False)  # noqa: FBT003
 

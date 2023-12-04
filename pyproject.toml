@@ -1,6 +1,6 @@
 [project]
 name = "pysv"
-version = "0.1.4"
+version = "0.1.5"
 description = "IEC 61850 SV (Sampled Values) publisher/subscriber for Python"
 authors = [
     {name = "Arthur Zopellaro", email = "github@zope.me"},

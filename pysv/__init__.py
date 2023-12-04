@@ -4,5 +4,9 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
-logging.basicConfig(level=os.getenv("PYSV_LOG_LEVEL", "INFO"))
+log_level = os.getenv("PYSV_LOG_LEVEL")
+
+if log_level:
+    logger.setLevel(log_level)

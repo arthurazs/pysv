@@ -8,6 +8,7 @@ from uvloop import new_event_loop
 
 from pysv import publisher_async as async_pub, subscriber_async as async_sub
 
+logging.basicConfig()
 logger = logging.getLogger(__name__)
 
 interface = os.environ["PYSV_INTERFACE"]
