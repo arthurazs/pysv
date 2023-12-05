@@ -19,5 +19,5 @@ async def run(loop: "AbstractEventLoop", interface: str, csv_path: "Path") -> No
         nic.bind((interface, 0))
         nic.setblocking(False)  # noqa: FBT003
 
-        for header, pdu in generate_sv_from(csv_path):
-            await gather(async_usleep(250), loop.sock_sendall(nic, header + pdu))
+        for time2sleep, header, pdu in generate_sv_from(csv_path):
+            await gather(async_usleep(time2sleep), loop.sock_sendall(nic, header + pdu))

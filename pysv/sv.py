@@ -1,10 +1,14 @@
+import logging
 from pathlib import Path
 from struct import pack as s_pack
 from struct import unpack as s_unpack
 from typing import TYPE_CHECKING, NamedTuple
-
+import decimal as dec
 if TYPE_CHECKING:
     from typing import Iterator, Sequence
+
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_PATH = Path("data") / "1999sub0_analog.csv"
 
@@ -27,7 +31,7 @@ def parse_neutral(sample: int) -> bytes:
     return s_pack("!i", sample) + b"\x00\x00\x20\x00"
 
 
-def generate_sv_from(path: "Path") -> "Iterator[tuple[bytes, bytes]]":
+def generate_sv_from(path: "Path") -> "Iterator[tuple[int, bytes, bytes]]":
     src_addr = b"\x00\x30\xa7\x22\x8d\x5d"
     dst_addr = b"\x01\x0c\xcd\x04\x00\x01"
     sv_ether = b"\x88\xba"
@@ -45,7 +49,17 @@ def generate_sv_from(path: "Path") -> "Iterator[tuple[bytes, bytes]]":
     conf_rev = b"\x83\x04\x00\x00\x00\x01"
     smp_synch = b"\x85\x01\x00"
     phs_meas_type_len = b"\x87\x40"
-    for index, (i_as, i_bs, i_cs, v_as, v_bs, v_cs) in enumerate(read_sample(path)):
+    previous_sleep_time = 0
+    for index, (sleep_time, i_as, i_bs, i_cs, v_as, v_bs, v_cs) in enumerate(read_sample(path)):
+        current_sleep_time = dec.Decimal(sleep_time)
+        time2sleep = current_sleep_time - previous_sleep_time
+        previous_sleep_time = current_sleep_time
+        logger.debug(
+            "time2sleep %.0f us | current %.0f us | previous %.0f us",
+            time2sleep,
+            current_sleep_time,
+            previous_sleep_time,
+        )
         i_ai, i_a = parse_sample(i_as)
         i_bi, i_b = parse_sample(i_bs)
         i_ci, i_c = parse_sample(i_cs)
@@ -77,7 +91,7 @@ def generate_sv_from(path: "Path") -> "Iterator[tuple[bytes, bytes]]":
             + smp_synch
         )
         pdu = phs_meas_type_len + i_a + i_b + i_c + i_n + v_a + v_b + v_c + v_n
-        yield header, pdu
+        yield int(time2sleep), header, pdu
 
 
 class PhsMeas(NamedTuple):
