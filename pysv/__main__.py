@@ -4,12 +4,15 @@ import sys
 from contextlib import suppress
 from pathlib import Path
 
-from uvloop import new_event_loop
+try:
+    from uvloop import new_event_loop
+except ImportError:
+    from asyncio import get_event_loop as new_event_loop
 
 from pysv import publisher_async as async_pub, subscriber_async as async_sub
 
 logging.basicConfig()
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pysv")
 
 interface = os.environ["PYSV_INTERFACE"]
 
