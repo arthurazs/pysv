@@ -7,6 +7,9 @@ authors = [
 ]
 readme = "README.md"
 requires-python = ">=3.10"
+dependencies = [
+  "python-dotenv>=1.0.0",
+]
 
 [project.optional-dependencies]
 async = [
@@ -16,7 +19,6 @@ dev = [
   "ruff>=0.1.5",
   "mypy>=1.7.0",
   "pytest>=7.4.3",
-  "python-dotenv>=1.0.0",
 ]
 
 [project.urls]
