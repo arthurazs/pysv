@@ -19,5 +19,8 @@ async def run(loop: "AbstractEventLoop", interface: str, csv_path: "Path") -> No
         nic.bind((interface, 0))
         nic.setblocking(False)  # noqa: FBT003
 
+        # TODO(arthurazs): check using chrt --rr
+        # TODO(arthurazs): check running async_usleep(250) instead of async_usleep(time2sleep)
+        # TODO(arthurazs): check sleeping 2_500 between each 10 SVs, instead of 250 each SV
         for time2sleep, header, pdu in generate_sv_from(csv_path):
             await gather(async_usleep(time2sleep), loop.sock_sendall(nic, header + pdu))
