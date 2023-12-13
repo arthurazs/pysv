@@ -69,7 +69,7 @@ def generate_sv_from(path: "Path") -> "Iterator[tuple[int, bytes, bytes]]":
         v_bi, v_b = parse_sample(v_bs)
         v_ci, v_c = parse_sample(v_cs)
         v_n = parse_neutral(v_ai + v_bi + v_ci)
-        smp_cnt = b"\x82\x02" + s_pack("!h", int(index))
+        smp_cnt = b"\x82\x02" + s_pack("!h", int(index % 4000))
 
         header = (
             dst_addr
