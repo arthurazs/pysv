@@ -28,9 +28,6 @@ dev = [
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["pysv"]
-
 [tool.ruff]
 select = [
     "F", "E", "W", "C90", "I", "N", "D", "UP", "YTT", "ANN", "ASYNC", "S", "BLE", "FBT", "B", "A", "COM", "C4", "DTZ",

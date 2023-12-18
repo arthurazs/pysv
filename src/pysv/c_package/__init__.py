@@ -3,13 +3,14 @@ import sys
 from ctypes import CDLL
 from pathlib import Path
 from pysv.sv import DEFAULT_PATH, generate_sv_from
+from glob import glob
 
 logger = logging.getLogger(__name__)
+dll_path = str(Path(__file__).parent / "publisher*.so")
+c_pub = CDLL(glob(dll_path)[0])
 
-c_pub = CDLL(str(Path.cwd() / "pysv" / "c_package" / "publisher.so"))
 
-
-def run(interface: str, csv_path: "Path") -> None:
+def publisher(interface: str, csv_path: "Path") -> None:
     socket_num = c_pub.open_socket()
     if socket_num == -1:
         logger.error("Could not open socket")
