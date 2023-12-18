@@ -16,7 +16,7 @@ def publisher(interface: str, csv_path: "Path") -> None:
         logger.error("Could not open socket")
         sys.exit(socket_num)
 
-    for header, pdu in generate_sv_from(csv_path):
+    for time2sleep, header, pdu in generate_sv_from(csv_path):
         smp_cnt = header[-11:-9]
         status = c_pub.send_sv(
             socket_num,
