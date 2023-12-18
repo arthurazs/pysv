@@ -3,7 +3,7 @@ from itertools import count
 from socket import AF_PACKET, SOCK_RAW, socket
 from time import time_ns
 from typing import TYPE_CHECKING
-from statistics import mean
+
 from pysv.sv import unpack_sv
 
 if TYPE_CHECKING:
@@ -21,16 +21,12 @@ async def run(loop: "AbstractEventLoop", interface: str) -> None:
 
         logger.info(time_ns())
 
-        # means = ()
-
         for counter in count():
             elapsed = time_ns()
+            # TODO @arthurazs: recv 18 bytes, then while true receiving the rest
             data = await loop.sock_recv(nic, 113)
             smp_cnt, i_a, i_b, i_c, i_n, v_a, v_b, v_c, v_n = unpack_sv(data)
-            # means += ((time_ns() - elapsed) * 1E-3, )
             logger.info(
                 "%4d/%4d: %13.3f us | ia %7d | ib %7d | ic %7d | in %7d |<>| va %7d | vb %7d | vc %7d | vn %7d",
                 counter, smp_cnt, (time_ns() - elapsed) * 1E-3, i_a, i_b, i_c, i_n, v_a, v_b, v_c, v_n,
             )
-            # if counter == 1199:
-            #     logger.info(mean(means[1:]))

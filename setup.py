@@ -8,6 +8,6 @@ setup(
                 "src/pysv/c_package/publisher.c",
             ],
             optional=True,
-        )
-    ]
+        ),
+    ],
 )

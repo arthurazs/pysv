@@ -1,11 +1,12 @@
+import decimal as dec
 import logging
 from pathlib import Path
 from struct import pack as s_pack
 from struct import unpack as s_unpack
 from typing import TYPE_CHECKING, NamedTuple
-import decimal as dec
+
 if TYPE_CHECKING:
-    from typing import Iterator, Sequence
+    from collections.abc import Iterator, Sequence
 
 
 logger = logging.getLogger(__name__)

@@ -9,7 +9,8 @@ try:
 except ImportError:
     from asyncio import get_event_loop as new_event_loop
 
-from pysv import publisher_async as async_pub, subscriber_async as async_sub
+from pysv import publisher_async as async_pub
+from pysv import subscriber_async as async_sub
 from pysv.c_package import publisher as c_pub
 
 logging.basicConfig()
