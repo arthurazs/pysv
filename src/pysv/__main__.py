@@ -30,5 +30,7 @@ elif "-as" in sys.argv:
     with suppress(KeyboardInterrupt):
         loop.run_until_complete(async_sub.run(loop, interface))
 elif "-debug" in sys.argv:
-    c_pub("enp1s0", Path("data") / "REGUAS_BJDLAPA_50.csv")
+    logger.info("Starting c_pub...")
+    c_pub(interface, Path("data") / "REGUAS_BJDLAPA_50.csv")
+    logger.info("Done!")
 loop.close()
