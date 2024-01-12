@@ -4,6 +4,8 @@ from pathlib import Path
 from struct import pack as s_pack
 from struct import unpack as s_unpack
 from typing import TYPE_CHECKING, NamedTuple
+from dataclasses import dataclass
+
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
@@ -107,12 +109,60 @@ class PhsMeas(NamedTuple):
     v_n: int
 
 
+@dataclass(eq=False, frozen=True, match_args=False, kw_only=True, slots=True)
+class Triplet:
+    tag: bytes
+    length: int
+    value: bytes
+
+    def __len__(self: "Triplet") -> int:
+        # TODO if len(value) >= 0x80, length should be > 1
+        return len(self.tag) + 1 + len(self.value)
+
+
+def triplet_unpack(bytes_string: bytes) -> "Triplet":
+    length = bytes_string[1]
+    
+    extended_length = 0
+    match length:
+        case 0x81:
+            extended_length = 1
+            length = bytes_string[2]
+        case 0x82:
+            extended_length = 2
+            length = s_unpack("!H", bytes_string[2:4])
+        case _ if length > 0x82:
+            msg = "Triplet length too big"
+            raise ValueError(msg)
+    value_index = 2 + extended_length
+    return Triplet(tag=bytes_string[0:1], length=length, value=bytes_string[value_index:value_index + length])
+
 def unpack_sv(bytes_string: bytes) -> PhsMeas:
-    cnt_len = bytes_string[35]
-    smp_cnt = s_unpack(UNPACKER_LENGTH[cnt_len], bytes_string[36 : 36 + cnt_len])[0]
-    data = bytes_string[47 + 2 :]
-    i_a, _, i_b, _, i_c, _, i_n, _ = s_unpack("!8i", data[: 8 * 4])
-    v_a, _, v_b, _, v_c, _, v_n, _ = s_unpack("!8i", data[8 * 4 :])
+    dst = bytes_string[0:6]
+    src = bytes_string[6:12]
+    eth_type = bytes_string[12:14]
+    app_id = bytes_string[14:16]
+    length = s_unpack("!H", bytes_string[16:18])
+    reserved1 = bytes_string[18:20]
+    reserved2 = bytes_string[20:22]
+    sav_pdu = triplet_unpack(bytes_string[22:])
+    num_of_asdu = triplet_unpack(sav_pdu.value)
+    seq_asdu = triplet_unpack(sav_pdu.value[len(num_of_asdu):])
+    asdu = triplet_unpack(seq_asdu.value)
+    sv_id = triplet_unpack(asdu.value)
+    tmp_index = len(sv_id)
+    smp_cnt_asn1 = triplet_unpack(asdu.value[tmp_index:])
+    tmp_index += len(smp_cnt_asn1)
+    conf_rev = triplet_unpack(asdu.value[tmp_index:])
+    tmp_index += len(conf_rev)
+    smp_synch = triplet_unpack(asdu.value[tmp_index:])
+    tmp_index += len(smp_synch)
+    phs_meas1 = triplet_unpack(asdu.value[tmp_index:])
+    del tmp_index
+    i_a, _, i_b, _, i_c, _, i_n, _ = s_unpack("!8i", phs_meas1.value[: 8 * 4])
+    v_a, _, v_b, _, v_c, _, v_n, _ = s_unpack("!8i", phs_meas1.value[8 * 4 :])
+
+    smp_cnt = s_unpack("!B" if smp_cnt_asn1.length == 1 else "!H", smp_cnt_asn1.value)[0]  # TODO bad code
     return PhsMeas(
         smp_cnt=smp_cnt,
         i_a=i_a,
