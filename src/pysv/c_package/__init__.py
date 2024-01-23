@@ -25,13 +25,13 @@ def publisher(interface: str, csv_path: "Path") -> None:
         sys.exit(interface_index)
     logger.debug("Found at index %d!", interface_index)
 
-    for time2sleep, header, pdu in generate_sv_from(csv_path):
+    for _time2sleep, header, _pdu in generate_sv_from(csv_path):
         smp_cnt = header[-11:-9]
         logger.debug("smp_cnt len: %d", len(smp_cnt))
         status = c_pub.send_sv(
             socket_num,
             interface_index,
-            b"\x01\x0c\xcd\x04\x00\x00" +
+            b"\x01\x0c\xcd\x04\x00\x00"
             b"\x00\xbe\x43\xcc\x53\x68" +
             smp_cnt,
             # pdu[2:],
