@@ -9,6 +9,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "python-dotenv>=1.0.0",
+  "pysn1 @ git+https://github.com/arthurazs/pysn1.git",
 ]
 
 [project.optional-dependencies]
