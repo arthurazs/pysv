@@ -33,22 +33,27 @@ def parse_neutral(sample: int) -> bytes:
 
 
 def generate_sv_from(path: "Path") -> "Iterator[tuple[int, bytes, bytes]]":
+    """Generates SV frames.
+
+    Returns:
+         (time2sleep_in_us, header, pdu)
+    """
     src_addr = b"\x00\x30\xa7\x22\x8d\x5d"
-    dst_addr = b"\x01\x0c\xcd\x04\x00\x01"
+    dst_addr = b"\x01\x0c\xcd\x04\x00\x00"
     sv_ether = b"\x88\xba"
     app_id = b"\x40\x00"
-    length = b"\x00\x63"  # TODO(arthurazs): calc?
+    length = b"\x00\x66"  # TODO(arthurazs): calc?
     reserved = b"\x00\x00\x00\x00"
     sv_type = b"\x60"
-    sv_len = b"\x59"  # TODO(arthurazs): calc?
+    sv_len = b"\x5C"  # TODO(arthurazs): calc?
     num_asdu = b"\x80\x01\x01"
     seq_asdu_type = b"\xa2"
-    seq_asdu_len = b"\x54"  # TODO(arthurazs): calc?
+    seq_asdu_len = b"\x57"  # TODO(arthurazs): calc?
     asdu_type = b"\x30"
-    asdu_len = b"\x52"  # TODO(arthurazs): calc?
-    sv_id = b"\x80\x01\x32"
+    asdu_len = b"\x55"  # TODO(arthurazs): calc?
+    sv_id = b"\x80\x044000"
     conf_rev = b"\x83\x04\x00\x00\x00\x01"
-    smp_synch = b"\x85\x01\x00"
+    smp_synch = b"\x85\x01\x02"
     phs_meas_type_len = b"\x87\x40"
     previous_sleep_time = dec.Decimal(0)
     for index, (sleep_time, i_as, i_bs, i_cs, v_as, v_bs, v_cs) in enumerate(read_sample(path)):
@@ -73,23 +78,8 @@ def generate_sv_from(path: "Path") -> "Iterator[tuple[int, bytes, bytes]]":
         smp_cnt = b"\x82\x02" + s_pack("!h", int(index % 4000))
 
         header = (
-            dst_addr
-            + src_addr
-            + sv_ether
-            + app_id
-            + length
-            + reserved
-            + sv_type
-            + sv_len
-            + num_asdu
-            + seq_asdu_type
-            + seq_asdu_len
-            + asdu_type
-            + asdu_len
-            + sv_id
-            + smp_cnt
-            + conf_rev
-            + smp_synch
+            dst_addr + src_addr + sv_ether + app_id + length + reserved + sv_type + sv_len + num_asdu + seq_asdu_type +
+            seq_asdu_len + asdu_type + asdu_len + sv_id + smp_cnt + conf_rev + smp_synch
         )
         pdu = phs_meas_type_len + i_a + i_b + i_c + i_n + v_a + v_b + v_c + v_n
         yield int(time2sleep), header, pdu
@@ -133,14 +123,4 @@ def unpack_sv(bytes_string: bytes) -> PhsMeas:
     v_a, _, v_b, _, v_c, _, v_n, _ = s_unpack("!8i", phs_meas1.value[8 * 4:])
 
     smp_cnt = s_unpack("!B" if smp_cnt_asn1.length == 1 else "!H", smp_cnt_asn1.value)[0]
-    return PhsMeas(
-        smp_cnt=smp_cnt,
-        i_a=i_a,
-        i_b=i_b,
-        i_c=i_c,
-        i_n=i_n,
-        v_a=v_a,
-        v_b=v_b,
-        v_c=v_c,
-        v_n=v_n,
-    )
+    return PhsMeas(smp_cnt=smp_cnt, i_a=i_a, i_b=i_b, i_c=i_c, i_n=i_n, v_a=v_a, v_b=v_b, v_c=v_c, v_n=v_n)

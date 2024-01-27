@@ -13,7 +13,7 @@ from pysv import publisher_async as async_pub
 from pysv import subscriber_async as async_sub
 from pysv.c_package import publisher as c_pub
 
-logging.basicConfig()
+logging.basicConfig(format="[%(levelname)7s] %(asctime)s | %(name)20s:%(lineno)4d > %(message)s")
 logger = logging.getLogger("pysv")
 
 interface = os.environ["PYSV_INTERFACE"]

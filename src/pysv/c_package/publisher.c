@@ -1,12 +1,24 @@
-#include <stdio.h>              // printf
+#include <stdio.h>              // perror
 #include <arpa/inet.h>          // socket
 #include <net/if.h>             // ifreq
 #include <string.h>             // memset
 #include <sys/ioctl.h>          // ioctl
 #include <linux/if_packet.h>    // sockaddr_ll
 #include <netinet/ether.h>      // ETH_ALEN
+#include <unistd.h>             // usleep
+#include <sys/time.h>           // gettimeofday
 
 #define BUFFER_SIZE             1024
+
+void busy_wait(suseconds_t usec) {
+    struct timeval begin, end, elapsed;
+    gettimeofday(&begin, 0);
+    while (1) {
+        gettimeofday(&end, 0);
+        timersub(&end, &begin, &elapsed);
+        if (elapsed.tv_usec >= usec) { break; }
+    }
+}
 
 int get_socket() {
     int sockfd;
@@ -31,44 +43,35 @@ int get_index(int sockfd, char interface[IFNAMSIZ]) {
     return index.ifr_ifindex;
 }
 
-int send_sv(int sockfd, int index, unsigned char pdu[14]) {
-    int len = 0;
+int send_sv(int sockfd, int index, unsigned char pdu[BUFFER_SIZE], unsigned short int length) {
     char buffer[BUFFER_SIZE];
     memset(buffer, 0, BUFFER_SIZE);
 
-    memcpy(buffer, pdu, 14);
-    len = 14;
+    // length = strlen((char *) pdu);  // strlen does not work bc of \x00 values inside the SV frame
+    memcpy(buffer, pdu, length);
 
     struct sockaddr_ll address;
     address.sll_ifindex = index;
     address.sll_halen = ETH_ALEN;
 
-    int status;
-    if ((status = sendto(sockfd, buffer, len, 0, (struct sockaddr*) &address, sizeof(struct sockaddr_ll))) < 0) {
-        return status;
-    }
-
-    return 0;
+    return sendto(sockfd, buffer, length, 0, (struct sockaddr*) &address, sizeof(struct sockaddr_ll));
 }
 
-int main(){
-    int sockfd = get_socket();
-    if (sockfd < 0) { return sockfd; }
-    // printf("sockfd %d\n", sockfd);
+int send_sv_rt(int sockfd, int index, unsigned short int time2sleep, unsigned char pdu[BUFFER_SIZE], unsigned short int length) {
 
-    int index = get_index(sockfd, "lo");
-    if (index < 0) { return index; }
-    // printf("index %d\n", index);
+    if (time2sleep > 0) {
+        usleep(time2sleep);  // I don't know if usleep(0) impacts the code's performance
+    }
 
-    unsigned char pdu[14] = {
-        0x01, 0x0c, 0xcd, 0x04, 0x00, 0x00, // dst
-        0x00, 0xbe, 0x43, 0xcc, 0x53, 0x68, // src
-        0x88, 0xba,                         // ether type
-    };
+    return send_sv(sockfd, index, pdu, length);
+}
 
-    int status = send_sv(sockfd, index, pdu);
-    if (status < 0) { return status; }
-    // printf("status %d\n", status);
 
-    return 0;
+int send_sv_busy_wait(int sockfd, int index, unsigned short int time2sleep, unsigned char pdu[BUFFER_SIZE], unsigned short int length) {
+
+    if (time2sleep > 0) {
+        busy_wait(time2sleep);  // I don't know if usleep(0) impacts the code's performance
+    }
+
+    return send_sv(sockfd, index, pdu, length);
 }

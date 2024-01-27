@@ -7,7 +7,7 @@ setup(
             sources=[
                 "src/pysv/c_package/publisher.c",
             ],
-            optional=True,
+            optional=False,
         ),
     ],
 )
