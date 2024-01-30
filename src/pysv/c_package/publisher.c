@@ -75,3 +75,7 @@ int send_sv_busy_wait(int sockfd, int index, unsigned short int time2sleep, unsi
 
     return send_sv(sockfd, index, pdu, length);
 }
+
+int close_socket(int sockfd) {
+    close(sockfd);
+}
