@@ -11,7 +11,7 @@ except ImportError:
 
 from pysv import publisher_async as async_pub
 from pysv import subscriber_async as async_sub
-from pysv.c_package import publisher as c_pub
+import pysv.c_package as c_pub
 
 logging.basicConfig(format="[%(levelname)7s] %(asctime)s | %(name)20s:%(lineno)4d > %(message)s")
 logger = logging.getLogger("pysv")
@@ -31,6 +31,6 @@ elif "-as" in sys.argv:
         loop.run_until_complete(async_sub.run(loop, interface))
 elif "-debug" in sys.argv:
     logger.info("Starting c_pub...")
-    c_pub(interface, Path("data") / "REGUAS_BJDLAPA_50.csv")
+    c_pub.publisher_busy_smart(interface, Path("data") / "REGUAS_BJDLAPA_50.csv")
     logger.info("Done!")
 loop.close()
