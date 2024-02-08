@@ -31,6 +31,6 @@ elif "-as" in sys.argv:
         loop.run_until_complete(async_sub.run(loop, interface))
 elif "-debug" in sys.argv:
     logger.info("Starting c_pub...")
-    c_pub.publisher_busy_smart(interface, Path("data") / "REGUAS_BJDLAPA_50.csv")
+    c_pub.publisher_busy_smart(interface, Path(os.environ["PYSV_CSV_FILE"]))
     logger.info("Done!")
 loop.close()
