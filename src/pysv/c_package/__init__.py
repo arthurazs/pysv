@@ -22,15 +22,17 @@ def _publisher(interface: str) -> tuple[int, int]:
     logger.debug("Opening socket...")
     socket_num = c_pub.get_socket()
     if socket_num == -1:
-        logger.error("Could not open socket")
-        sys.exit(socket_num)
+        msg = "Could not open socket, status -1"
+        logger.error(msg)
+        raise PermissionError(msg)
     logger.debug("Socket opened!")
 
     logger.debug("Finding %s interface...", interface)
     interface_index = c_pub.get_index(socket_num, interface.encode("utf8"))
     if interface_index == -1:
-        logger.error("Could not find interface %s", interface)
-        sys.exit(interface_index)
+        msg = "Could not find interface %s, status -1" % interface
+        logger.error(msg)
+        raise ValueError(msg)
     logger.debug("Found at index %d!", interface_index)
 
     return socket_num, interface_index
@@ -42,8 +44,9 @@ def _send_sv(
     # len is necessary bc C's strlen does not work when there's \x00 values inside the SV frame
     status = func(socket_num, interface_index, time2sleep, bytestring, length)
     if status < 0:
-        logger.error("Could not send SV, status %d", status)
-        sys.exit(status)
+        msg = "Could not send SV, status %d" % status
+        logger.error(msg)
+        raise RuntimeError(msg)
 
 
 def _publisher_smart(interface: str, csv_path: "Path", func: SendSvFunc) -> None:
