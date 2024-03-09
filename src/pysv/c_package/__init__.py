@@ -4,6 +4,7 @@ from ctypes import CDLL
 from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING
+from statistics import mean
 
 from pysv.sv import generate_sv_from
 
@@ -53,18 +54,30 @@ def _publisher_smart(interface: str, csv_path: "Path", func: SendSvFunc) -> None
     socket_num, interface_index = _publisher(interface)
 
     previous_slept, previous_time2sleep = 0, 0
-    for time2sleep, header, pdu in generate_sv_from(csv_path):
+
+    tot = []
+    difs = []
+    t2s = 250
+    for _, header, pdu in generate_sv_from(csv_path):
+        b = perf_counter()
         before = perf_counter()
         diff = int(previous_time2sleep - previous_slept)
+        difs.append(diff)
         if diff < -250:
             logger.critical(
                 "\nprevious2sleep %d\nprevious_slept %d\ndiff %d\ntime2sleep %d\ntime2sleep + diff %d",
-                previous_time2sleep, previous_slept, diff, time2sleep, time2sleep + diff,
+                previous_time2sleep, previous_slept, diff, t2s, t2s + diff,
             )
             diff = 0
-        _send_sv(socket_num, interface_index, func, time2sleep + diff, header + pdu, len(header) + len(pdu))
+        _send_sv(socket_num, interface_index, func, t2s + diff, header + pdu, len(header) + len(pdu))
         previous_slept = (perf_counter() - before) * 1e6
-        previous_time2sleep = time2sleep
+        previous_time2sleep = t2s
+        a = perf_counter()
+        tot.append((a - b) * 1e6)
+    # logger.critical(difs)
+    # difs = difs[2:-1]
+    logger.critical("difs %.2f / %.2f / %.2f", min(difs), mean(difs), max(difs))
+    logger.critical("tot  %.2f / %.2f / %.2f", min(tot), mean(tot), max(tot))
 
     c_pub.close_socket(socket_num)
 
