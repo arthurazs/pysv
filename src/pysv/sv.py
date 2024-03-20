@@ -32,7 +32,7 @@ def parse_neutral(sample: int) -> bytes:
     return s_pack("!i", sample) + b"\x00\x00\x20\x00"
 
 
-def generate_sv_from(path: "Path") -> "Iterator[tuple[int, bytes, bytes]]":
+def generate_sv_from(path: "Path") -> "Iterator[tuple[int, int, bytes, bytes]]":
     """Generates SV frames.
 
     Returns:
@@ -75,14 +75,15 @@ def generate_sv_from(path: "Path") -> "Iterator[tuple[int, bytes, bytes]]":
         v_bi, v_b = parse_sample(v_bs)
         v_ci, v_c = parse_sample(v_cs)
         v_n = parse_neutral(v_ai + v_bi + v_ci)
-        smp_cnt = b"\x82\x02" + s_pack("!h", int(index % 4000))
+        smp_cnt = int(index % 4000)
+        smp_cnt_bytes = b"\x82\x02" + s_pack("!h", smp_cnt)
 
         header = (
             dst_addr + src_addr + sv_ether + app_id + length + reserved + sv_type + sv_len + num_asdu + seq_asdu_type +
-            seq_asdu_len + asdu_type + asdu_len + sv_id + smp_cnt + conf_rev + smp_synch
+            seq_asdu_len + asdu_type + asdu_len + sv_id + smp_cnt_bytes + conf_rev + smp_synch
         )
         pdu = phs_meas_type_len + i_a + i_b + i_c + i_n + v_a + v_b + v_c + v_n
-        yield int(time2sleep), header, pdu
+        yield int(time2sleep), smp_cnt, header, pdu
 
 
 class PhsMeas(NamedTuple):

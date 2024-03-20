@@ -66,6 +66,21 @@ int send_sv_rt(int sockfd, int index, unsigned short int time2sleep, unsigned ch
     return send_sv(sockfd, index, pdu, length);
 }
 
+void busy_wait_top_of_second() {
+    struct timeval end;
+    while (1) {
+        gettimeofday(&end, 0);
+        if (end.tv_usec < 1) { break; }
+    }
+}
+
+int send_first_sv_busy_wait(int sockfd, int index, unsigned short int time2sleep, unsigned char pdu[BUFFER_SIZE], unsigned short int length) {
+
+    busy_wait_top_of_second();
+
+    return send_sv(sockfd, index, pdu, length);
+}
+
 
 int send_sv_busy_wait(int sockfd, int index, unsigned short int time2sleep, unsigned char pdu[BUFFER_SIZE], unsigned short int length) {
 
