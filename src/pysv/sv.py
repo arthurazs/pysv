@@ -1,8 +1,10 @@
+from pysv.utils import enet_stom
+from struct import pack, unpack
+from dataclasses import dataclass
+from enum import Enum
 import decimal as dec
 import logging
 from pathlib import Path
-from struct import pack as s_pack
-from struct import unpack as s_unpack
 from typing import TYPE_CHECKING, NamedTuple
 
 from pysn1.triplet import Triplet
@@ -25,25 +27,71 @@ def read_sample(path: "Path") -> "Iterator[Sequence[str]]":
 
 def parse_sample(string_sample: str) -> tuple[int, bytes]:
     sample = int(float(string_sample))
-    return sample, s_pack("!i", sample) + b"\x00\x00\x00\x00"
+    return sample, pack("!i", sample) + b"\x00\x00\x00\x00"
 
 
 def parse_neutral(sample: int) -> bytes:
-    return s_pack("!i", sample) + b"\x00\x00\x20\x00"
+    return pack("!i", sample) + b"\x00\x00\x20\x00"
 
 
-def generate_sv_from(path: "Path") -> "Iterator[tuple[int, int, bytes, bytes]]":
+class SamplesSynchronized(Enum):
+    NONE = 0
+    LOCAL = 1
+    GLOBAL = 2
+
+    def triplet(self: "SamplesSynchronized") -> "Triplet":
+        return Triplet.build(tag=0x85, value=pack("!B", self.value))
+
+    def __bytes__(self: "SamplesSynchronized") -> bytes:
+        return bytes(self.triplet())
+
+
+@dataclass
+class SVHeader:
+    # TODO @arthurazs: params should be classes instead of str, e.g., bytes(sv_header.src_addr)
+    src_addr: str
+    dst_addr: str
+    app_id: str
+    sv_id: str
+    smp_sync: "SamplesSynchronized"
+
+    @property
+    def src_addr_bytes(self: "SVHeader") -> bytes:
+        return enet_stom(self.src_addr)
+
+    @property
+    def dst_addr_bytes(self: "SVHeader") -> bytes:
+        return enet_stom(self.src_addr)
+
+    @property
+    def app_id_bytes(self: "SVHeader") -> bytes:
+        # see 61850-9-2
+        return pack("!H", int(self.app_id, 16))
+
+    @property
+    def sv_id_bytes(self: "SVHeader") -> bytes:
+        return bytes(Triplet.build(tag=0x80, value=self.sv_id.encode()))  # vString129
+
+    @property
+    def smp_sync_bytes(self: "SVHeader") -> bytes:
+        return bytes(self.smp_sync)
+
+
+def generate_sv_from(
+    path: "Path", sv_header: "SVHeader", frequency: int = 4000,
+) -> "Iterator[tuple[int, int, bytes, bytes]]":
     """Generates SV frames.
 
     Returns:
          (time2sleep_in_us, header, pdu)
     """
-    src_addr = b"\x00\x30\xa7\x22\x8d\x5d"
-    dst_addr = b"\x01\x0c\xcd\x04\x00\x00"
+    src_addr = sv_header.src_addr_bytes
+    dst_addr = sv_header.dst_addr_bytes
     sv_ether = b"\x88\xba"
-    app_id = b"\x40\x00"
+    app_id = sv_header.app_id_bytes
     length = b"\x00\x66"  # TODO(arthurazs): calc?
     reserved = b"\x00\x00\x00\x00"
+    sav_pdu = Triplet.build(tag=0x60, value=b"")
     sv_type = b"\x60"
     sv_len = b"\x5C"  # TODO(arthurazs): calc?
     num_asdu = b"\x80\x01\x01"
@@ -51,10 +99,9 @@ def generate_sv_from(path: "Path") -> "Iterator[tuple[int, int, bytes, bytes]]":
     seq_asdu_len = b"\x57"  # TODO(arthurazs): calc?
     asdu_type = b"\x30"
     asdu_len = b"\x55"  # TODO(arthurazs): calc?
-    sv_id = b"\x80\x044000"
+    sv_id = sv_header.sv_id_bytes
     conf_rev = b"\x83\x04\x00\x00\x00\x01"
-    smp_synch = b"\x85\x01\x02"
-    phs_meas_type_len = b"\x87\x40"
+    smp_synch = sv_header.smp_sync_bytes
     previous_sleep_time = dec.Decimal(0)
     for index, (sleep_time, i_as, i_bs, i_cs, v_as, v_bs, v_cs) in enumerate(read_sample(path)):
         current_sleep_time = dec.Decimal(sleep_time)
@@ -75,14 +122,14 @@ def generate_sv_from(path: "Path") -> "Iterator[tuple[int, int, bytes, bytes]]":
         v_bi, v_b = parse_sample(v_bs)
         v_ci, v_c = parse_sample(v_cs)
         v_n = parse_neutral(v_ai + v_bi + v_ci)
-        smp_cnt = int(index % 4000)
-        smp_cnt_bytes = b"\x82\x02" + s_pack("!h", smp_cnt)
+        smp_cnt = int(index % frequency)
+        smp_cnt_bytes = b"\x82\x02" + pack("!h", smp_cnt)
 
         header = (
             dst_addr + src_addr + sv_ether + app_id + length + reserved + sv_type + sv_len + num_asdu + seq_asdu_type +
             seq_asdu_len + asdu_type + asdu_len + sv_id + smp_cnt_bytes + conf_rev + smp_synch
         )
-        pdu = phs_meas_type_len + i_a + i_b + i_c + i_n + v_a + v_b + v_c + v_n
+        pdu = bytes(Triplet.build(tag=0x87, value=i_a + i_b + i_c + i_n + v_a + v_b + v_c + v_n))
         yield int(time2sleep), smp_cnt, header, pdu
 
 
@@ -103,7 +150,7 @@ def unpack_sv(bytes_string: bytes) -> PhsMeas:
     _src = bytes_string[6:12]
     _eth_type = bytes_string[12:14]
     _app_id = bytes_string[14:16]
-    _length = s_unpack("!H", bytes_string[16:18])
+    _length = unpack("!H", bytes_string[16:18])
     _reserved1 = bytes_string[18:20]
     _reserved2 = bytes_string[20:22]
     sav_pdu = Triplet.from_bytes(bytes_string[22:])
@@ -120,8 +167,8 @@ def unpack_sv(bytes_string: bytes) -> PhsMeas:
     tmp_index += len(smp_synch)
     phs_meas1 = Triplet.from_bytes(asdu.value[tmp_index:])
     del tmp_index
-    i_a, _, i_b, _, i_c, _, i_n, _ = s_unpack("!8i", phs_meas1.value[: 8 * 4])
-    v_a, _, v_b, _, v_c, _, v_n, _ = s_unpack("!8i", phs_meas1.value[8 * 4:])
+    i_a, _, i_b, _, i_c, _, i_n, _ = unpack("!8i", phs_meas1.value[: 8 * 4])
+    v_a, _, v_b, _, v_c, _, v_n, _ = unpack("!8i", phs_meas1.value[8 * 4:])
 
-    smp_cnt = s_unpack("!B" if smp_cnt_asn1.length == 1 else "!H", smp_cnt_asn1.value)[0]
+    smp_cnt = unpack("!B" if smp_cnt_asn1.length == 1 else "!H", smp_cnt_asn1.value)[0]
     return PhsMeas(smp_cnt=smp_cnt, i_a=i_a, i_b=i_b, i_c=i_c, i_n=i_n, v_a=v_a, v_b=v_b, v_c=v_c, v_n=v_n)
