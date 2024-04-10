@@ -22,8 +22,12 @@ interface = os.environ["PYSV_INTERFACE"]
 loop = new_event_loop()
 
 sv_config = SVConfig(
-    dst_mac="01:0c:cd:04:00:00", src_mac="0030a7228d5d", app_id="4000", sv_id="4000", conf_rev=1,
-    smp_sync=SamplesSynchronized.GLOBAL,
+    # dst and src mac can be written with or without separators
+    dst_mac="01:0c:cd:04:00:00", src_mac="0030a7228d5d",
+    app_id="4000",  # appid should be a string with a hex number ranging from 4000 to 7FFF
+    sv_id="4000",  # svid can be any string of 129 max len
+    conf_rev=1,  # int
+    smp_sync=SamplesSynchronized.GLOBAL,  # none, local or global
 )
 
 if "-ap" in sys.argv:

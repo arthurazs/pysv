@@ -10,7 +10,7 @@ def enet_stom(mac_address: str) -> bytes:
     if len(mac_address) == MAC_LEN_WITH_SPLITTER:
         splitter = mac_address[2]  # probably one of these: " ", "-", ":"
         mac_address = mac_address.replace(splitter, "")
-    return pack("!Q", int(mac_address, 16))
+    return pack("!Q", int(mac_address, 16))[2:]  # mac is 6 bytes long, Q generates 8 bytes
 
 
 def usleep(microseconds: int) -> None:

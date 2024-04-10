@@ -1,5 +1,6 @@
 import decimal as dec
 import logging
+import sys
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -93,7 +94,7 @@ def generate_sv_from(
     """
     dst_mac = sv_config.dst_mac_bytes
     src_mac = sv_config.src_mac_bytes
-    ether_type = b"\x88ba"
+    ether_type = b"\x88\xba"
     header = dst_mac + src_mac + ether_type
 
     app_id = sv_config.app_id_bytes
@@ -101,7 +102,7 @@ def generate_sv_from(
     reserved2 = b"\x00\x00"
 
     sv_id = sv_config.sv_id_bytes
-    conf_rev = sv_config.smp_sync_bytes
+    conf_rev = sv_config.conf_rev_bytes
     smp_sync = sv_config.smp_sync_bytes
 
     no_asdu = b"\x80\x01\x01"
