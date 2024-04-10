@@ -27,6 +27,7 @@ sudo .venv/bin/python -m pysv -ap  # async publisher
 sudo .venv/bin/python -m pysv -as  # async subscriber
 sudo .venv/bin/python -m pysv -debug # publisher in C
 # sudo nice -n -20 chrt --fifo 99 .venv/bin/python -m pysv -debug  # minimum niceness, maximum priority
+# sudo PYSV_INTERFACE="lo" nice -n -20 .venv/bin/python -m pysv -debug
 ```
 ### Optional quickstart
 

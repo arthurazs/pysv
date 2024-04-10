@@ -4,7 +4,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, Callable  # noqa: UP035
 
-from pysv.sv import generate_sv_from
+from pysv.sv import generate_sv_from, return_sv_from
 
 if TYPE_CHECKING:
 
@@ -16,6 +16,7 @@ c_pub = CDLL(str(next(dll_path.glob("publisher*.so"))))
 
 
 SendSvFunc = Callable[[int, int, int, bytes, int], int]
+NewSendSvFunc = Callable[[int, int, bytes, int, int, int], int]
 
 
 def _publisher(interface: str) -> tuple[int, int]:
@@ -43,6 +44,18 @@ def _send_sv(
 ) -> None:
     # len is necessary bc C's strlen does not work when there's \x00 values inside the SV frame
     status = func(socket_num, interface_index, time2sleep, bytestring, length)
+    if status < 0:
+        msg = "Could not send SV, status %d" % status
+        logger.error(msg)
+        raise RuntimeError(msg)
+
+
+def _send_default_sv(
+    socket_num: int, interface_index: int, func: NewSendSvFunc,
+    all_svs: bytes, sv_count: int, sv_length: int, time2sleep: int,
+) -> None:
+    # len is necessary bc C's strlen does not work when there's \x00 values inside the SV frame
+    status = func(socket_num, interface_index, all_svs, sv_count, sv_length, time2sleep)
     if status < 0:
         msg = "Could not send SV, status %d" % status
         logger.error(msg)
@@ -87,6 +100,21 @@ def _publisher_dumb(interface: str, csv_path: "Path", sv_config: "SVConfig", fun
         _send_sv(socket_num, interface_index, func, time2sleep, sv, len(sv))
 
     c_pub.close_socket(socket_num)
+
+
+def _publisher_default(interface: str, csv_path: "Path", sv_config: "SVConfig", func: NewSendSvFunc) -> None:
+    socket_num, interface_index = _publisher(interface)
+
+    logger.info("Loading file and parsing into bytes..")
+    time2sleep, svs, count, sv_len = return_sv_from(csv_path, sv_config)
+    logger.info("Sending SV frames...")
+    _send_default_sv(socket_num, interface_index, func, svs, count, sv_len, time2sleep)
+
+    c_pub.close_socket(socket_num)
+
+
+def publisher_default(interface: str, csv_path: "Path", sv_config: "SVConfig") -> None:
+    _publisher_default(interface, csv_path, sv_config, c_pub.send_sv)
 
 
 def publisher_busy_smart(interface: str, csv_path: "Path", sv_config: "SVConfig") -> None:

@@ -5,7 +5,7 @@ setup(
         Extension(
             name="pysv.c_package.publisher",
             sources=[
-                "src/pysv/c_package/publisher.c",
+                "src/pysv/c_package/new_publisher.c",
             ],
             optional=False,
         ),

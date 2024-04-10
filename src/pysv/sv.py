@@ -84,6 +84,70 @@ class SVConfig:
         return bytes(self.smp_sync)
 
 
+def return_sv_from(
+        path: "Path", sv_config: "SVConfig", frequency: int = 4000,
+) -> "tuple[int, bytes, int, int]":
+    """Return SV frames.
+
+    Returns:
+         (time2sleep_in_us, list_of_svs_in_bytes, number_of_svs, length_of_one_sv)
+    """
+    dst_mac = sv_config.dst_mac_bytes
+    src_mac = sv_config.src_mac_bytes
+    ether_type = b"\x88\xba"
+    header = dst_mac + src_mac + ether_type
+
+    app_id = sv_config.app_id_bytes
+    reserved1 = b"\x00\x00"
+    reserved2 = b"\x00\x00"
+
+    sv_id = sv_config.sv_id_bytes
+    conf_rev = sv_config.conf_rev_bytes
+    smp_sync = sv_config.smp_sync_bytes
+
+    no_asdu = b"\x80\x01\x01"
+
+    svs = b""
+    time2sleep = 0
+    sv_length = 0
+    previous_sleep_time = dec.Decimal(0)
+    counter = 0
+    for index, (sleep_time, i_as, i_bs, i_cs, v_as, v_bs, v_cs) in enumerate(read_sample(path)):
+        current_sleep_time = dec.Decimal(sleep_time)
+        if time2sleep == 0:
+            time2sleep = int(current_sleep_time - previous_sleep_time)
+        previous_sleep_time = current_sleep_time
+
+        i_ai, i_a = parse_sample(i_as)
+        i_bi, i_b = parse_sample(i_bs)
+        i_ci, i_c = parse_sample(i_cs)
+        i_n = parse_neutral(i_ai + i_bi + i_ci)
+
+        v_ai, v_a = parse_sample(v_as)
+        v_bi, v_b = parse_sample(v_bs)
+        v_ci, v_c = parse_sample(v_cs)
+        v_n = parse_neutral(v_ai + v_bi + v_ci)
+
+        smp_cnt_int = int(index % frequency)
+        smp_cnt = bytes(Triplet.build(tag=0x82, value=pack("!H", smp_cnt_int)))
+        phs_meas = bytes(Triplet.build(tag=0x87, value=i_a + i_b + i_c + i_n + v_a + v_b + v_c + v_n))
+        asdu = bytes(Triplet.build(tag=0x30, value=sv_id + smp_cnt + conf_rev + smp_sync + phs_meas))
+
+        seq_asdu = bytes(Triplet.build(tag=0xa2, value=asdu))
+        sav_pdu = bytes(Triplet.build(tag=0x60, value=no_asdu + seq_asdu))
+
+        # TODO @arthurazs: improve length calc (it should always be the same)
+        length = pack("!H", len(sav_pdu) + 8)
+        sv = app_id + length + reserved1 + reserved2 + sav_pdu
+
+        # TODO @arthurazs: maybe return header and sv separately, so i can pass the header only once to C
+        sv_length = len(header+sv)
+        svs += header + sv
+        counter += 1
+
+    return time2sleep, svs, counter, sv_length
+
+
 def generate_sv_from(
     path: "Path", sv_config: "SVConfig", frequency: int = 4000,
 ) -> "Iterator[tuple[int, int, bytes]]":
