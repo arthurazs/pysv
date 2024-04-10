@@ -47,72 +47,70 @@ class SamplesSynchronized(Enum):
 
 
 @dataclass
-class SVHeader:
-    # TODO @arthurazs: params should be classes instead of str, e.g., bytes(sv_header.src_addr)
+class SVConfig:
+    # TODO @arthurazs: params should be classes instead of str, e.g., bytes(sv_config.src_addr)
     src_addr: str
     dst_addr: str
     app_id: str
     sv_id: str
+    conf_rev: int
     smp_sync: "SamplesSynchronized"
 
     @property
-    def src_addr_bytes(self: "SVHeader") -> bytes:
+    def src_addr_bytes(self: "SVConfig") -> bytes:
         return enet_stom(self.src_addr)
 
     @property
-    def dst_addr_bytes(self: "SVHeader") -> bytes:
+    def dst_addr_bytes(self: "SVConfig") -> bytes:
         return enet_stom(self.src_addr)
 
     @property
-    def app_id_bytes(self: "SVHeader") -> bytes:
+    def app_id_bytes(self: "SVConfig") -> bytes:
         # see 61850-9-2
         return pack("!H", int(self.app_id, 16))
 
     @property
-    def sv_id_bytes(self: "SVHeader") -> bytes:
+    def sv_id_bytes(self: "SVConfig") -> bytes:
         return bytes(Triplet.build(tag=0x80, value=self.sv_id.encode()))  # vString129
 
     @property
-    def smp_sync_bytes(self: "SVHeader") -> bytes:
+    def conf_rev_bytes(self: "SVConfig") -> bytes:
+        return bytes(Triplet.build(tag=0x83, value=pack("!I", self.conf_rev)))
+
+    @property
+    def smp_sync_bytes(self: "SVConfig") -> bytes:
         return bytes(self.smp_sync)
 
 
 def generate_sv_from(
-    path: "Path", sv_header: "SVHeader", frequency: int = 4000,
+    path: "Path", sv_config: "SVConfig", frequency: int = 4000,
 ) -> "Iterator[tuple[int, int, bytes, bytes]]":
     """Generates SV frames.
 
     Returns:
          (time2sleep_in_us, header, pdu)
     """
-    src_addr = sv_header.src_addr_bytes
-    dst_addr = sv_header.dst_addr_bytes
-    sv_ether = b"\x88\xba"
-    app_id = sv_header.app_id_bytes
-    length = b"\x00\x66"  # TODO(arthurazs): calc?
-    reserved = b"\x00\x00\x00\x00"
-    sav_pdu = Triplet.build(tag=0x60, value=b"")
-    sv_type = b"\x60"
-    sv_len = b"\x5C"  # TODO(arthurazs): calc?
-    num_asdu = b"\x80\x01\x01"
-    seq_asdu_type = b"\xa2"
-    seq_asdu_len = b"\x57"  # TODO(arthurazs): calc?
-    asdu_type = b"\x30"
-    asdu_len = b"\x55"  # TODO(arthurazs): calc?
-    sv_id = sv_header.sv_id_bytes
-    conf_rev = b"\x83\x04\x00\x00\x00\x01"
-    smp_synch = sv_header.smp_sync_bytes
+    dst_mac = sv_config.dst_addr_bytes
+    src_mac = sv_config.src_addr_bytes
+    ether_type = b"\x88ba"
+    header = dst_mac + src_mac + ether_type
+
+    app_id = sv_config.app_id_bytes
+    reserved1 = b"\x00\x00"
+    reserved2 = b"\x00\x00"
+
+    sv_id = sv_config.sv_id_bytes
+    conf_rev = sv_config.smp_sync_bytes
+    smp_sync = sv_config.smp_sync_bytes
+
+    no_asdu = b"\x80\x01\x01"
+
     previous_sleep_time = dec.Decimal(0)
     for index, (sleep_time, i_as, i_bs, i_cs, v_as, v_bs, v_cs) in enumerate(read_sample(path)):
         current_sleep_time = dec.Decimal(sleep_time)
         time2sleep = current_sleep_time - previous_sleep_time
         previous_sleep_time = current_sleep_time
-        logger.debug(
-            "time2sleep %.0f us | current %.0f us | previous %.0f us",
-            time2sleep,
-            current_sleep_time,
-            previous_sleep_time,
-        )
+
         i_ai, i_a = parse_sample(i_as)
         i_bi, i_b = parse_sample(i_bs)
         i_ci, i_c = parse_sample(i_cs)
@@ -122,15 +120,20 @@ def generate_sv_from(
         v_bi, v_b = parse_sample(v_bs)
         v_ci, v_c = parse_sample(v_cs)
         v_n = parse_neutral(v_ai + v_bi + v_ci)
-        smp_cnt = int(index % frequency)
-        smp_cnt_bytes = b"\x82\x02" + pack("!h", smp_cnt)
 
-        header = (
-            dst_addr + src_addr + sv_ether + app_id + length + reserved + sv_type + sv_len + num_asdu + seq_asdu_type +
-            seq_asdu_len + asdu_type + asdu_len + sv_id + smp_cnt_bytes + conf_rev + smp_synch
-        )
-        pdu = bytes(Triplet.build(tag=0x87, value=i_a + i_b + i_c + i_n + v_a + v_b + v_c + v_n))
-        yield int(time2sleep), smp_cnt, header, pdu
+        smp_cnt_int = int(index % frequency)
+        smp_cnt = bytes(Triplet.build(tag=0x82, value=pack("!H", smp_cnt_int)))
+        phs_meas = bytes(Triplet.build(tag=0x87, value=i_a + i_b + i_c + i_n + v_a + v_b + v_c + v_n))
+        asdu = bytes(Triplet.build(tag=0x30, value=sv_id + smp_cnt + conf_rev + smp_sync + phs_meas))
+
+        seq_asdu = bytes(Triplet.build(tag=0xa2, value=asdu))
+        sav_pdu = bytes(Triplet.build(tag=0x60, value=no_asdu + seq_asdu))
+
+        # TODO @arthurazs: improve length calc (it should always be the same)
+        length = pack("!H", len(sav_pdu) + 8)
+        sv = app_id + length + reserved1 + reserved2 + sav_pdu
+
+        yield int(time2sleep), smp_cnt_int, header, sv
 
 
 class PhsMeas(NamedTuple):
@@ -154,8 +157,8 @@ def unpack_sv(bytes_string: bytes) -> PhsMeas:
     _reserved1 = bytes_string[18:20]
     _reserved2 = bytes_string[20:22]
     sav_pdu = Triplet.from_bytes(bytes_string[22:])
-    num_of_asdu = Triplet.from_bytes(sav_pdu.value)
-    seq_asdu = Triplet.from_bytes(sav_pdu.value[len(num_of_asdu):])
+    no_asdu = Triplet.from_bytes(sav_pdu.value)
+    seq_asdu = Triplet.from_bytes(sav_pdu.value[len(no_asdu):])
     asdu = Triplet.from_bytes(seq_asdu.value)
     sv_id = Triplet.from_bytes(asdu.value)
     tmp_index = len(sv_id)
