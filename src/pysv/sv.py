@@ -1,13 +1,14 @@
-from pysv.utils import enet_stom
-from struct import pack, unpack
-from dataclasses import dataclass
-from enum import Enum
 import decimal as dec
 import logging
+from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
+from struct import pack, unpack
 from typing import TYPE_CHECKING, NamedTuple
 
 from pysn1.triplet import Triplet
+
+from pysv.utils import enet_stom
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
@@ -49,20 +50,20 @@ class SamplesSynchronized(Enum):
 @dataclass
 class SVConfig:
     # TODO @arthurazs: params should be classes instead of str, e.g., bytes(sv_config.src_addr)
-    src_addr: str
-    dst_addr: str
+    dst_mac: str
+    src_mac: str
     app_id: str
     sv_id: str
     conf_rev: int
     smp_sync: "SamplesSynchronized"
 
     @property
-    def src_addr_bytes(self: "SVConfig") -> bytes:
-        return enet_stom(self.src_addr)
+    def dst_mac_bytes(self: "SVConfig") -> bytes:
+        return enet_stom(self.dst_mac)
 
     @property
-    def dst_addr_bytes(self: "SVConfig") -> bytes:
-        return enet_stom(self.src_addr)
+    def src_mac_bytes(self: "SVConfig") -> bytes:
+        return enet_stom(self.src_mac)
 
     @property
     def app_id_bytes(self: "SVConfig") -> bytes:
@@ -84,14 +85,14 @@ class SVConfig:
 
 def generate_sv_from(
     path: "Path", sv_config: "SVConfig", frequency: int = 4000,
-) -> "Iterator[tuple[int, int, bytes, bytes]]":
+) -> "Iterator[tuple[int, int, bytes]]":
     """Generates SV frames.
 
     Returns:
          (time2sleep_in_us, header, pdu)
     """
-    dst_mac = sv_config.dst_addr_bytes
-    src_mac = sv_config.src_addr_bytes
+    dst_mac = sv_config.dst_mac_bytes
+    src_mac = sv_config.src_mac_bytes
     ether_type = b"\x88ba"
     header = dst_mac + src_mac + ether_type
 
@@ -133,7 +134,8 @@ def generate_sv_from(
         length = pack("!H", len(sav_pdu) + 8)
         sv = app_id + length + reserved1 + reserved2 + sav_pdu
 
-        yield int(time2sleep), smp_cnt_int, header, sv
+        # TODO @arthurazs: maybe return header and sv separately, so i can pass the header only once to C
+        yield int(time2sleep), smp_cnt_int, header + sv
 
 
 class PhsMeas(NamedTuple):

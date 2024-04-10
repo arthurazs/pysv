@@ -1,22 +1,21 @@
 import logging
-import sys
 from ctypes import CDLL
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING
-from statistics import mean
+from typing import TYPE_CHECKING, Callable  # noqa: UP035
 
 from pysv.sv import generate_sv_from
 
 if TYPE_CHECKING:
-    from typing import Callable
+
+    from pysv.sv import SVConfig
 
 logger = logging.getLogger(__name__)
 dll_path = Path(__file__).parent
 c_pub = CDLL(str(next(dll_path.glob("publisher*.so"))))
 
 
-SendSvFunc = "Callable[[int, int, int, bytes, int], int]"
+SendSvFunc = Callable[[int, int, int, bytes, int], int]
 
 
 def _publisher(interface: str) -> tuple[int, int]:
@@ -40,7 +39,7 @@ def _publisher(interface: str) -> tuple[int, int]:
 
 
 def _send_sv(
-    socket_num: int, interface_index: int, func: SendSvFunc, time2sleep: int, bytestring: bytes, length: int
+    socket_num: int, interface_index: int, func: SendSvFunc, time2sleep: int, bytestring: bytes, length: int,
 ) -> None:
     # len is necessary bc C's strlen does not work when there's \x00 values inside the SV frame
     status = func(socket_num, interface_index, time2sleep, bytestring, length)
@@ -50,14 +49,14 @@ def _send_sv(
         raise RuntimeError(msg)
 
 
-def _publisher_smart(interface: str, csv_path: "Path", func: SendSvFunc) -> None:
+def _publisher_smart(interface: str, csv_path: "Path", sv_config: "SVConfig", func: SendSvFunc) -> None:
     socket_num, interface_index = _publisher(interface)
 
     previous_slept, previous_time2sleep = 0, 0
 
     first = True
     t2s = 250
-    for _, smp_cnt, header, pdu in generate_sv_from(csv_path):
+    for _, smp_cnt, sv in generate_sv_from(csv_path, sv_config):
         before = perf_counter()
         diff = previous_time2sleep - previous_slept
         if diff < -t2s:
@@ -69,38 +68,38 @@ def _publisher_smart(interface: str, csv_path: "Path", func: SendSvFunc) -> None
         if first:
             _send_sv(
                 socket_num, interface_index, c_pub.send_first_sv_busy_wait,
-                t2s + diff, header + pdu, len(header) + len(pdu),
+                t2s + diff, sv, len(sv),
             )
             first = False
             previous_slept = t2s
         else:
-            _send_sv(socket_num, interface_index, func, t2s + diff, header + pdu, len(header) + len(pdu))
+            _send_sv(socket_num, interface_index, func, t2s + diff, sv, len(sv))
             previous_slept = int((perf_counter() - before) * 1e6)
         previous_time2sleep = t2s
 
     c_pub.close_socket(socket_num)
 
 
-def _publisher_dumb(interface: str, csv_path: "Path", func: SendSvFunc) -> None:
+def _publisher_dumb(interface: str, csv_path: "Path", sv_config: "SVConfig", func: SendSvFunc) -> None:
     socket_num, interface_index = _publisher(interface)
 
-    for time2sleep, header, pdu in generate_sv_from(csv_path):
-        _send_sv(socket_num, interface_index, func, time2sleep, header + pdu, len(header) + len(pdu))
+    for time2sleep, _smp_cnt, sv in generate_sv_from(csv_path, sv_config):
+        _send_sv(socket_num, interface_index, func, time2sleep, sv, len(sv))
 
     c_pub.close_socket(socket_num)
 
 
-def publisher_busy_smart(interface: str, csv_path: "Path") -> None:
-    _publisher_smart(interface, csv_path, c_pub.send_sv_busy_wait)
+def publisher_busy_smart(interface: str, csv_path: "Path", sv_config: "SVConfig") -> None:
+    _publisher_smart(interface, csv_path, sv_config, c_pub.send_sv_busy_wait)
 
 
-def publisher_busy_dumb(interface: str, csv_path: "Path") -> None:
-    _publisher_dumb(interface, csv_path, c_pub.send_sv_busy_wait)
+def publisher_busy_dumb(interface: str, csv_path: "Path", sv_config: "SVConfig") -> None:
+    _publisher_dumb(interface, csv_path, sv_config, c_pub.send_sv_busy_wait)
 
 
-def publisher_rt_smart(interface: str, csv_path: "Path") -> None:
-    _publisher_smart(interface, csv_path, c_pub.send_sv_rt)
+def publisher_rt_smart(interface: str, csv_path: "Path", sv_config: "SVConfig") -> None:
+    _publisher_smart(interface, csv_path, sv_config, c_pub.send_sv_rt)
 
 
-def publisher_rt_dumb(interface: str, csv_path: "Path") -> None:
-    _publisher_dumb(interface, csv_path, c_pub.send_sv_rt)
+def publisher_rt_dumb(interface: str, csv_path: "Path", sv_config: "SVConfig") -> None:
+    _publisher_dumb(interface, csv_path, sv_config, c_pub.send_sv_rt)
